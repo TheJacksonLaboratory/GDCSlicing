@@ -1,57 +1,70 @@
 #Author: Victor Wang
 #Affiliation: The Jackson Laboratory for Genomic Medicine
 #Affiliation: The University of Connecticut School of Medicine, Department of Genetics and Genomic Medicine
-#Desc: Converts UCSC information on canonical exons to BED files for exon coverage calculations
-#Note: This was written for Python 3
+#Desc: Parses UCSC Table Browser files to retrieve canonical exon coordinates and write to individual BED files
 
-#These two files are from the UCSC Table Browser
-exon_bed = 'known_genes.bed'
-canonical = 'known_canonical.txt'
+import pickle
 
-#This file contains the genes you are interested in created BED files for
-genes = 'genes.txt'
+#UCSC Table knownGene, track Gencode v24, assembly hg38
+ucsc_gene = 'hg38_ucsc_genes.txt'
+#UCSC Table knownCanonical, track Gencode v24, assembly hg38
+canonical = 'hg38_canonical_ensg.txt'
+#UCSC files are in Gencode 24, get metadata
+gencode = 'gencode.v24.metadata.HGNC'
+#Gathered all the ENST ids from TCGA MAF files previously
+gene_info = pickle.load(open('tcga_gene_info.p', 'rb'))
 
-gene_set = set([x.strip() for x in open(genes)])
+enst_set = set()
+#Each element is ( Gene symbol, ENSG ID, ENST ID, HGNC ID)
+for g in gene_info:
+	enst_set.add(g[2])
+
 id_set = set()
-gene_dict = dict()
-
-#Store UCSC IDs of canonical exons only
 canonical_file = open(canonical)
-canonical_file.readline() #Ignore header
+#Skip header line
+canonical_file.readline()
 for line in canonical_file:
-	spl = line.split('\t')
+	spl = line.strip().split('\t')
 	chromosome = spl[0]
-	#Ignore scaffolds as TCGA BAM files won't align there
+	#Ignore scaffolds
 	if '_' in chromosome:
-		break
-	gene = spl[4].strip()
-	if gene in gene_set:
-		ucsc_id = spl[3]
-		id_set.add(ucsc_id)
-		gene_dict[ucsc_id] = gene
+		continue
+	g_id = spl[4] #UCSC gene ID
+	id_set.add(g_id)
 
+gene_file = open(ucsc_gene)
+#Skip header line
+gene_file.readline()
 exon_dict = dict()
+for line in gene_file:
+	spl = line.strip().split('\t')
+	g_id = spl[0] #UCSC gene ID
+	if g_id not in id_set: #Check if this gene is the canonical transcript
+		continue
+	enst = spl[11]
+	#TCGA doesn't have ID version number, so ignore it (not safe but not many other workarounds)
+	if enst[:enst.rindex('.')] not in enst_set:
+		continue
+	chrom = spl[1]
+	strand = spl[2]
+	exon_start = spl[8][:-1] #Remove trailing comma
+	exon_end = spl[9][:-1]
+	#Associate gene coordinate information with ENST
+	exon_dict[enst] = [chrom, exon_start, exon_end, strand]
 
-#Pull exon coordinates for canonical exons
-for line in open(exon_bed):
-	spl = line.split('\t')
-	ucsc_id = spl[3]
-	ucsc_id = ucsc_id[:ucsc_id.index('_')]
-	#Ignore coordinates that are not from the canonical exons
-	#Ignore coordinates that are not from genes we care about
-	if ucsc_id in id_set:
-		gene = gene_dict[ucsc_id]
-		exon_list = exon_dict.get(gene, list())
-		chrm = spl[0]
-		exon_start = spl[1]
-		exon_end = spl[2]
-		exon_list.append((chrm, exon_start, exon_end))
-		exon_dict[gene] = exon_list
-
-#Write out BED files
-for gene in exon_dict.keys():
-	exon_list = exon_dict[gene]
-	writer = open('bed/' + gene + '.bed','w')
-	for exon in exon_list:
-		writer.write('%s\t%s\t%s\n' % exon)
-	writer.close()
+#Associate UCSC gene coordinate info with the Gencode v24 name
+for line in open(gencode):
+	spl = line.strip().split('\t')
+	enst = spl[0]
+	d = exon_dict.get(enst, None)
+	if d != None:
+		chrom = d[0]
+		exon_s = d[1]
+		exon_e = d[2]
+		strand = d[3]
+		gene = spl[1] #Gene name from Gencode v24
+		#Write to BED file
+		writer = open('tcga_bed_v24/' + gene + '.bed','w')
+		for s, e in zip(exon_s, exon_e):
+			writer.write('%s\t%s\t%s\t%s\t%s\t%s\n' % (chrom, s, e, gene, 0, strand))
+		writer.close()
