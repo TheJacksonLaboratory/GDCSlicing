@@ -98,7 +98,7 @@ for line in reader:
 				exon += 1
 				exon_out = exon
 				if strand == '-': #Flip exon count for - strand
-					exon_out = n_exons - exon 
+					exon_out = n_exons - exon + 1
 				exon_num_list.append(exon_out)
 			#Output similar to a BED file, but with added UCSC ID and exon number associated with information)
 			cds_list.append((chrom, cds_s_l, cds_e_l, gene, '0', strand, u_id, exon_num_list, n_exons))
