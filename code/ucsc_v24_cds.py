@@ -79,10 +79,10 @@ for line in reader:
 		cds_s_l = list()
 		cds_e_l = list()
 		cds_list = cds_dict.get(gene, list())
+		exon = 0 #Keep track of which exon is which for downstream analysis outputs
 		if cds_s == cds_e: #No CDS
 			cds_list.append((chrom, [cds_s], [cds_e], gene, '0', strand, u_id, [-1], 0))
 		else:
-			exon = 1 #Keep track of which exon is which for downstream analysis outputs
 			n_exons = len(x_start)
 			exon_num_list = list()
 			for s, e in zip(x_start, x_end):
@@ -95,13 +95,13 @@ for line in reader:
 					e = cds_e #IF CDS ends in this exon, truncate exon coordinates
 				cds_s_l.append(s)
 				cds_e_l.append(e)
+				exon += 1
 				exon_out = exon
 				if strand == '-': #Flip exon count for - strand
 					exon_out = n_exons - exon 
 				exon_num_list.append(exon_out)
-				exon += 1
 			#Output similar to a BED file, but with added UCSC ID and exon number associated with information)
-			cds_list.append((chrom, cds_s_l, cds_e_l, gene, '0', strand, u_id, exon_num_list, exon))
+			cds_list.append((chrom, cds_s_l, cds_e_l, gene, '0', strand, u_id, exon_num_list, n_exons))
 		cds_dict[gene] = cds_list
 		
 pickle.dump(cds_dict, open('ref/tcga_cds_dict.p', 'wb'))
