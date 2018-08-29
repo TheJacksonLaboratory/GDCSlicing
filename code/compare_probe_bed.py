@@ -6,16 +6,19 @@
 import pickle
 import numpy as np
 import pandas as pd
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument('bed', help='Sorted probe target BED file. If file is not sorted, this script will not work properly')
+parser.add_argument('-o', metavar='filename', help='Name of the output file which contains genes and exons with poor overlap with the provided BED file')
+args = parser.parse_args()
 
 #Sorted probe target BED file. If file is not sorted, this script will not work properly.
-design_file = ''
-output_file = ''
+design_file = args.bed
+output_file = args.o
 
-if design_file == '':
-	print('No comparison BED file was provided')
-	exit()
 
-if output_file == '':
+if output_file == None:
 	output_file = design_file[:design_file.rindex('.')] + '.undercovered.txt'
 
 def num_sorter_key(value):
